@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>心情歌单 - 听见你的情绪</title>
+
+  <style>
+    :root {
+      /* 默认背景渐变色，会随心情通过JS动态改变 */
+      --bg-color-1: #667eea;
+      --bg-color-2: #764ba2;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      padding: 24px;
+      display: grid;
+      place-items: center;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: #fff;
+      background: linear-gradient(135deg, var(--bg-color-1), var(--bg-color-2));
+      transition: background 0.8s ease-in-out;
+    }
+
+    .container {
+      width: min(800px, 100%);
+      padding: 32px;
+      text-align: center;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.15);
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    /* 专属定制头像样式 */
+    .custom-avatar {
+      width: 80px; 
+      height: 80px; 
+      border-radius: 50%; 
+      object-fit: cover; 
+      border: 3px solid #fff; 
+      box-shadow: 0 6px 15px rgba(0,0,0,0.15); 
+      margin-bottom: 12px;
+    }
+
+    h1 { margin-top: 0; font-weight: 600; letter-spacing: 2px; }
+    .subtitle { color: rgba(255,255,255,0.9); font-size: 0.95rem; margin-bottom: 24px; }
+
+    .moods {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 14px;
+      margin: 28px 0;
+    }
+
+    .mood-button {
+      width: 105px;
+      min-height: 108px;
+      padding: 10px;
+      border: 2px solid transparent;
+      border-radius: 18px;
+      color: #333;
+      background: rgba(255, 255, 255, 0.8);
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .mood-button:hover, .mood-button:focus-visible {
+      transform: translateY(-5px);
+      background: rgba(255, 255, 255, 1);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+      outline: none;
+    }
+
+    .mood-button.selected {
+      border-color: #ffd166;
+      background: #fffdf5;
+      transform: translateY(-5px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+
+    .emoji { display: block; font-size: 38px; transition: transform 0.3s; }
+    .mood-button:hover .emoji { transform: scale(1.1); }
+    .mood-name { display: block; margin-top: 8px; font-weight: 600; font-size: 0.9rem; }
+    .checkmark { display: block; min-height: 18px; margin-top: 4px; color: #d4a373; font-weight: bold; font-size: 0.8rem; }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: end;
+      gap: 14px;
+      margin-bottom: 26px;
+    }
+
+    .number-control {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      text-align: left;
+      font-weight: 500;
+      font-size: 0.9rem;
+    }
+
+    select, .action-button {
+      min-height: 44px;
+      padding: 10px 18px;
+      border: none;
+      border-radius: 12px;
+      font: inherit;
+      font-size: 0.95rem;
+    }
+
+    select { color: #333; background: #fff; cursor: pointer; outline: none; }
+    
+    .action-button { font-weight: bold; cursor: pointer; transition: all 0.2s; }
+    .action-button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .action-button:active { transform: translateY(0); }
+    
+    .recommend-button { color: #4a4a4a; background: #ffd166; }
+    .clear-button { color: #fff; background: rgba(0, 0, 0, 0.25); }
+
+    .status { min-height: 24px; margin: 0 0 16px; font-weight: 500; letter-spacing: 0.5px; }
+    .error { color: #ffeb3b; }
+
+    .quote-box {
+      font-size: 1.05rem;
+      font-weight: 300;
+      font-style: italic;
+      margin-bottom: 20px;
+      padding: 10px;
+      color: rgba(255, 255, 255, 0.95);
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+      display: none;
+      animation: fadeIn 0.8s ease;
+    }
+
+    .recommendations { display: grid; gap: 20px; text-align: left; }
+    
+    .mood-results {
+      padding: 24px;
+      border-radius: 18px;
+      color: #333;
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    }
+
+    .mood-results h2 { margin: 0 0 16px; font-size: 1.2rem; color: #444; border-bottom: 2px solid #f0f0f0; padding-bottom: 8px; }
+
+    .song-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+
+    .song-item {
+      padding: 12px 16px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      position: relative;
+      cursor: default;
+      opacity: 0;
+      transform: translateY(15px);
+      animation: fadeInUp 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      transition: background 0.2s;
+    }
+    .song-item:hover { background: #eef1f5; }
+
+    @keyframes fadeInUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .song-icon { margin-right: 12px; color: #a0aab5; font-size: 1.2rem; }
+    .song-title { font-weight: 600; color: #2c3e50; font-size: 1.05rem; }
+    .artist { color: #7f8c8d; font-size: 0.9rem; margin-left: 8px; }
+
+    .lyric-tooltip {
+      position: absolute;
+      bottom: calc(100% + 5px);
+      left: 20px;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      white-space: nowrap;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(5px);
+      transition: all 0.3s ease;
+      z-index: 10;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    .lyric-tooltip::after {
+      content: ''; position: absolute; top: 100%; left: 15px;
+      border-width: 5px; border-style: solid;
+      border-color: rgba(0, 0, 0, 0.85) transparent transparent transparent;
+    }
+    .song-item:hover .lyric-tooltip { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 540px) {
+      .container { padding: 24px 16px; }
+      .mood-button { width: 90px; min-height: 100px; }
+      .controls, .number-control, select, .action-button { width: 100%; }
+      .lyric-tooltip { display: none; }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+    <!-- 你的定制照片将显示在这里 -->
+    <img src="photo.jpg" alt="我的专属头像" class="custom-avatar">
+    
+    <h1>心情歌单</h1>
+    <p class="subtitle">选择此刻的心情，让音乐懂你。</p>
+
+    <div class="moods" aria-label="选择心情">
+      <button class="mood-button" data-mood="happy" aria-pressed="false">
+        <span class="emoji">😊</span>
+        <span class="mood-name">开心 (Happy)</span>
+        <span class="checkmark" aria-hidden="true"></span>
+      </button>
+      <button class="mood-button" data-mood="sad" aria-pressed="false">
+        <span class="emoji">🌧️</span>
+        <span class="mood-name">难过 (Sad)</span>
+        <span class="checkmark" aria-hidden="true"></span>
+      </button>
+      <button class="mood-button" data-mood="energetic" aria-pressed="false">
+        <span class="emoji">⚡</span>
+        <span class="mood-name">兴奋 (Energetic)</span>
+        <span class="checkmark" aria-hidden="true"></span>
+      </button>
+      <button class="mood-button" data-mood="calm" aria-pressed="false">
+        <span class="emoji">🍃</span>
+        <span class="mood-name">平静 (Calm)</span>
+        <span class="checkmark" aria-hidden="true"></span>
+      </button>
+      <button class="mood-button" data-mood="romantic" aria-pressed="false">
+        <span class="emoji">✨</span>
+        <span class="mood-name">浪漫 (Romantic)</span>
+        <span class="checkmark" aria-hidden="true"></span>
+      </button>
+    </div>
+
+    <div class="controls">
+      <label class="number-control" for="songCount">
+        每种心情几首歌？
+        <select id="songCount">
+          <option value="1">1 首</option>
+          <option value="2">2 首</option>
+          <option value="3" selected>3 首</option>
+          <option value="4">4 首</option>
+          <option value="5">5 首</option>
+        </select>
+      </label>
+      <button class="action-button recommend-button" id="recommendButton">为我推荐</button>
+      <button class="action-button clear-button" id="clearButton">重置</button>
+    </div>
+
+    <p class="status" id="status" aria-live="polite">
+      👇 还没选心情呢，点个上面的表情试试看？
+    </p>
+
+    <div id="quoteBox" class="quote-box"></div>
+    <section class="recommendations" id="recommendations" aria-label="歌曲推荐结果" aria-live="polite"></section>
+  </main>
+
+  <script>
+    const APP_DATA = {
+      themes: {
+        default:   ["#667eea", "#764ba2"],
+        happy:     ["#ff9a9e", "#fecfef"],
+        sad:       ["#6b8cce", "#3b5998"],
+        energetic: ["#f12711", "#f5af19"],
+        calm:      ["#43e97b", "#38f9d7"],
+        romantic:  ["#a18cd1", "#fbc2eb"],
+        mixed:     ["#84fab0", "#8fd3f4"]
+      },
+      
+      moods: {
+        happy:     { label: "开心", emoji: "😊" },
+        sad:       { label: "难过", emoji: "🌧️" },
+        energetic: { label: "兴奋", emoji: "⚡" },
+        calm:      { label: "平静", emoji: "🍃" },
+        romantic:  { label: "浪漫", emoji: "✨" }
+      },
+
+      quotes: {
+        happy:     ["今天的光线真好，配得上你灿烂的笑脸。", "好事正在酝酿，先听首歌庆祝一下吧！", "快乐是会传染的，这首歌也是。"],
+        sad:       ["允许自己难过一会儿，没关系的，歌里有拥抱。", "乌云蔽日是暂时的，听完这首歌，天就快亮了。", "眼泪是情绪的出口，让旋律陪你静一静。"],
+        energetic: ["戴上耳机，这一刻你就是世界的主角！", "心跳加速的频率，就是热爱生活的证明。", "别压抑你的光芒，跟着节奏一起燃烧！"],
+        calm:      ["世界很喧嚣，但此刻这里只有你和音乐。", "深呼吸，把杂念交给风，把耳朵交给旋律。", "在安静里，积蓄明天重新出发的力量。"],
+        romantic:  ["耳机分你一半，浪漫就在此刻蔓延。", "世间所有的相遇，都像这首歌一样动听。", "有些话藏在心里，这首歌替你讲出来。"],
+        mixed:     ["生活是五颜六色的调色盘，你的心情也是最美的风景。", "情绪交织的此刻，正是你独一无二的模样。"]
+      },
+
+      songs: {
+        happy: [
+          { title: "阳光宅男", artist: "周杰伦", lyric: "让我们乘着阳光，海上冲浪，吸引她目光" },
+          { title: "恋爱ing", artist: "五月天", lyric: "恋爱ing happy ing，心情就像是坐上一台喷射机" },
+          { title: "看我72变", artist: "蔡依林", lyric: "美丽极限，爱漂亮没有终点" },
+          { title: "甜甜的", artist: "周杰伦", lyric: "我轻轻地尝一口，你说的爱我" },
+          { title: "第一天", artist: "孙燕姿", lyric: "第一天 我存在 第一次呼吸畅快" },
+          { title: "姐姐妹妹站起来", artist: "陶晶莹", lyric: "那就等着沦陷吧，如果爱情真伟大" },
+          { title: "日不落", artist: "蔡依林", lyric: "我要送你日不落的想念，寄出代表爱的明信片" },
+          { title: "大城小爱", artist: "王力宏", lyric: "脑袋都是你，心里都是你，小小的爱在大城里好甜蜜" },
+          { title: "宁夏", artist: "梁静茹", lyric: "宁静的夏天，天空中繁星点点" },
+          { title: "好心情", artist: "李玟", lyric: "一见你就有好心情，像夏天吃着冰淇淋" },
+          { title: "小情歌", artist: "苏打绿", lyric: "这是一首简单的小情歌，唱着人们心肠的曲折" },
+          { title: "爱你", artist: "王心凌", lyric: "情话多说一点，想我就多看一眼" },
+          { title: "我的未来式", artist: "郭采洁", lyric: "我的未来式 由我做主，每一个动作我都完整投入" },
+          { title: "星晴", artist: "周杰伦", lyric: "手牵手一步两步三步四步望着天" },
+          { title: "有点甜", artist: "汪苏泷/BY2", lyric: "是你让我看见干枯沙漠开出花一朵" },
+          { title: "私奔到月球", artist: "五月天/陈绮贞", lyric: "让双脚去腾空，让我们去感受，那无忧的真空" },
+          { title: "夏天的风", artist: "温岚", lyric: "夏天的风，我永远记得，清清楚楚地说你爱我" },
+          { title: "当你", artist: "王心凌", lyric: "当你的眼睛 眯着笑，当你喝可乐 当你吵" },
+          { title: "麦芽糖", artist: "周杰伦", lyric: "我牵着你的手经过，种麦芽糖的山坡" },
+          { title: "微微", artist: "傅如乔", lyric: "微微就是秋天里的落叶，微微就是彩虹的一月" }
+        ],
+        sad: [
+          { title: "十年", artist: "陈奕迅", lyric: "十年之后，我们是朋友，还可以问候" },
+          { title: "后来", artist: "刘若英", lyric: "后来，我总算学会了如何去爱，可惜你早已远去" },
+          { title: "洋葱", artist: "杨宗纬", lyric: "如果你愿意一层一层一层的剥开我的心" },
+          { title: "可惜不是你", artist: "梁静茹", lyric: "可惜不是你，陪我到最后" },
+          { title: "搁浅", artist: "周杰伦", lyric: "我只能永远读着对白，读着我给你的伤害" },
+          { title: "好久不见", artist: "陈奕迅", lyric: "你会不会忽然的出现，在街角的咖啡店" },
+          { title: "说谎", artist: "林宥嘉", lyric: "我没有说谎，我何必说谎" },
+          { title: "成全", artist: "林宥嘉", lyric: "我对你付出的青春这么多年，换来了一句谢谢你的成全" },
+          { title: "突然好想你", artist: "五月天", lyric: "最怕空气突然安静，最怕朋友突然的关心" },
+          { title: "K歌之王", artist: "陈奕迅", lyric: "我已经相信有些人我永远不必等" },
+          { title: "修炼爱情", artist: "林俊杰", lyric: "修炼爱情的心酸，学会放好以前的渴望" },
+          { title: "开始懂了", artist: "孙燕姿", lyric: "用心酸微笑去原谅了，也翻越了" },
+          { title: "我不难过", artist: "孙燕姿", lyric: "我不难过，这不算什么，只是为什么眼泪会流我也不懂" },
+          { title: "过火", artist: "张信哲", lyric: "怎么忍心怪你犯了错，是我给你自由过了火" },
+          { title: "其实都没有", artist: "杨宗纬", lyric: "我也曾经憧憬过，后来没结果" },
+          { title: "如果这都不算爱", artist: "张学友", lyric: "如果这都不算爱，我有什么好悲哀" },
+          { title: "如果没有你", artist: "莫文蔚", lyric: "Hey 我真的好想你，不知道你现在到底在哪里" },
+          { title: "你就不要想起我", artist: "田馥甄", lyric: "你就不要想我到 疯掉" },
+          { title: "空白格", artist: "蔡健雅", lyric: "其实很简单，其实很自然，两个人的爱由两人分担" },
+          { title: "新不了情", artist: "万芳", lyric: "回忆过去，痛苦的相思忘不了" }
+        ],
+        energetic: [
+          { title: "离开地球表面", artist: "五月天", lyric: "丢掉手表 丢外套 丢掉背包 再丢唠叨" },
+          { title: "倔强", artist: "五月天", lyric: "我和我最后的倔强，握紧双手绝对不放" },
+          { title: "逆战", artist: "张杰", lyric: "在这个风起云涌的战场上，暴风少年登场" },
+          { title: "伤心的人别听慢歌", artist: "五月天", lyric: "不要再问，谁是对的，谁是错的" },
+          { title: "霍元甲", artist: "周杰伦", lyric: "霍霍 霍霍霍 霍霍霍" },
+          { title: "王妃", artist: "萧敬腾", lyric: "夜太美，尽管再危险，总有人黑着眼眶熬着夜" },
+          { title: "本草纲目", artist: "周杰伦", lyric: "如果华佗再世，崇洋都被医治" },
+          { title: "三天三夜", artist: "张惠妹", lyric: "三天三夜的三更半夜，跳舞不要停歇" },
+          { title: "海阔天空", artist: "Beyond", lyric: "原谅我这一生不羁放纵爱自由" },
+          { title: "怒放的生命", artist: "汪峰", lyric: "我想要怒放的生命，就像飞翔在辽阔天空" },
+          { title: "我的天空", artist: "南征北战", lyric: "在我的天空，我是年轻的霸王" },
+          { title: "孤勇者", artist: "陈奕迅", lyric: "爱你孤身走暗巷，爱你不跪的模样" },
+          { title: "派对动物", artist: "五月天", lyric: "Let's go party party all night, oh oh oh oh" },
+          { title: "龙拳", artist: "周杰伦", lyric: "我右拳打开了天，化身为龙" },
+          { title: "红日", artist: "李克勤", lyric: "命运就算颠沛流离，命运就算曲折离奇" },
+          { title: "最炫民族风", artist: "凤凰传奇", lyric: "你是我天边最美的云彩，让我用心把你留下来" },
+          { title: "绿光", artist: "孙燕姿", lyric: "期待着一个幸运，和一个冲击" },
+          { title: "黄种人", artist: "谢霆锋", lyric: "黄种人，来到地上，挺起新的胸膛" },
+          { title: "大艺术家", artist: "蔡依林", lyric: "Wake up 你是大艺术家，你真心创作的爱无价" },
+          { title: "自由", artist: "张震岳", lyric: "说爱我 说爱我 难道你不再爱我" }
+        ],
+        calm: [
+          { title: "虫儿飞", artist: "郑伊健", lyric: "黑黑的天空低垂，亮亮的繁星相随" },
+          { title: "贝加尔湖畔", artist: "李健", lyric: "在我的怀里，在你的眼里，那里春风沉醉，那里绿草如茵" },
+          { title: "大鱼", artist: "周深", lyric: "怕你飞远去，怕你离我而去，更怕你永远停留在这里" },
+          { title: "城里的月光", artist: "许美静", lyric: "城里的月光把梦照亮，请温暖他心房" },
+          { title: "遇见", artist: "孙燕姿", lyric: "我遇见谁，会有怎样的对白，我等的人，他在多远的未来" },
+          { title: "红豆", artist: "王菲", lyric: "还没为你把红豆，熬成缠绵的伤口" },
+          { title: "外面的世界", artist: "齐秦", lyric: "外面的世界很精彩，外面的世界很无奈" },
+          { title: "当你老了", artist: "赵照", lyric: "当你老了，走不动了，炉火旁打盹，回忆青春" },
+          { title: "被遗忘的时光", artist: "蔡琴", lyric: "是谁在敲打我窗，是谁在撩动琴弦" },
+          { title: "同桌的你", artist: "老狼", lyric: "明天你是否会想起，昨天你写的日记" },
+          { title: "那些年", artist: "胡夏", lyric: "那些年错过的大雨，那些年错过的爱情" },
+          { title: "平凡之路", artist: "朴树", lyric: "我曾经跨过山和大海，也穿过人山人海" },
+          { title: "借我", artist: "谢春花", lyric: "借我十年，借我亡命天涯的勇敢" },
+          { title: "如愿", artist: "王菲", lyric: "你是 岁月长河 星火燃起 的天空" },
+          { title: "成都", artist: "赵雷", lyric: "和我在成都的街头走一走，直到所有的灯都熄灭了也不停留" },
+          { title: "岁月神偷", artist: "金玟岐", lyric: "时间是让人猝不及防的东西，晴时有风阴有时雨" },
+          { title: "天黑黑", artist: "孙燕姿", lyric: "天黑黑，欲落雨，天黑黑，黑黑" },
+          { title: "温柔", artist: "五月天", lyric: "不知道，不明了，不想要，为什么，我的心" },
+          { title: "慢慢喜欢你", artist: "莫文蔚", lyric: "慢慢喜欢你，慢慢的亲密，慢慢聊自己" },
+          { title: "萱草花", 张小斐: "高高的青山上，萱草花开放" }
+        ],
+        romantic: [
+          { title: "月亮代表我的心", artist: "邓丽君", lyric: "你问我爱你有多深，我爱你有几分" },
+          { title: "告白气球", artist: "周杰伦", lyric: "亲爱的 爱上你 从那天起 甜蜜的很轻易" },
+          { title: "今天你要嫁给我", artist: "陶喆/蔡依林", lyric: "听我说 手牵手 跟我一起走，创造幸福的生活" },
+          { title: "最浪漫的事", artist: "赵咏华", lyric: "我能想到最浪漫的事，就是和你一起慢慢变老" },
+          { title: "至少还有你", artist: "林忆莲", lyric: "如果全世界我也可以放弃，至少还有你值得我去珍惜" },
+          { title: "因为爱情", artist: "陈奕迅/王菲", lyric: "因为爱情，不会轻易悲伤，所以一切都是年轻的模样" },
+          { title: "有一点动心", artist: "张信哲/刘嘉玲", lyric: "我对你有一点动心，却如此害怕看你的眼睛" },
+          { title: "简单爱", artist: "周杰伦", lyric: "我想就这样牵着你的手不放开" },
+          { title: "情非得已", artist: "庾澄庆", lyric: "难以忘记初次见你，一双迷人的眼睛" },
+          { title: "非你莫属", artist: "林依晨", lyric: "懂得让我微笑的人，再没有谁比你有天份" },
+          { title: "爱很简单", artist: "陶喆", lyric: "I love you，无法不爱你 baby" },
+          { title: "专属天使", artist: "TANK", lyric: "没有谁能取代你在我心上，拥有一个专属天使" },
+          { title: "小酒窝", artist: "林俊杰/蔡卓妍", lyric: "小酒窝长睫毛，是你最美的记号" },
+          { title: "七里香", artist: "周杰伦", lyric: "雨下整夜，我的爱溢出就像雨水" },
+          { title: "一次就好", artist: "杨宗纬", lyric: "一次就好，我带你去看天荒地老" },
+          { title: "往后余生", artist: "马良", lyric: "往后余生，风雪是你，平淡是你" },
+          { title: "无与伦比的美丽", artist: "苏打绿", lyric: "天上风筝在天上飞，地上人儿在地上追" },
+          { title: "勇气", artist: "梁静茹", lyric: "爱真的需要勇气，来面对流言蜚语" },
+          { title: "你最珍贵", artist: "张学友/高慧君", lyric: "未来的日子有你才美，梦才会真一点" },
+          { title: "这就是爱", artist: "张杰", lyric: "这就是爱~~~" }
+        ]
+      }
+    };
+
+    const selectedMoods = new Set();
+    const moodButtons = document.querySelectorAll(".mood-button");
+    const songCount = document.getElementById("songCount");
+    const recommendButton = document.getElementById("recommendButton");
+    const clearButton = document.getElementById("clearButton");
+    const recommendations = document.getElementById("recommendations");
+    const status = document.getElementById("status");
+    const quoteBox = document.getElementById("quoteBox");
+
+    function updateBackground() {
+      let themeKeys = Array.from(selectedMoods);
+      let targetColor;
+      
+      if (themeKeys.length === 0) {
+        targetColor = APP_DATA.themes.default;
+      } else if (themeKeys.length === 1) {
+        targetColor = APP_DATA.themes[themeKeys[0]];
+      } else {
+        targetColor = APP_DATA.themes.mixed;
+      }
+      
+      document.documentElement.style.setProperty('--bg-color-1', targetColor[0]);
+      document.documentElement.style.setProperty('--bg-color-2', targetColor[1]);
+    }
+
+    moodButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const mood = button.dataset.mood;
+        if (selectedMoods.has(mood)) {
+          selectedMoods.delete(mood);
+          button.classList.remove("selected");
+          button.setAttribute("aria-pressed", "false");
+          button.querySelector(".checkmark").textContent = "";
+        } else {
+          selectedMoods.add(mood);
+          button.classList.add("selected");
+          button.setAttribute("aria-pressed", "true");
+          button.querySelector(".checkmark").textContent = "✓ 已选";
+        }
+        updateStatus();
+        updateBackground();
+      });
+    });
+
+    function getRandomSongs(songList, amount) {
+      const shuffled = [...songList];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const randomIndex = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[i]];
+      }
+      return shuffled.slice(0, amount);
+    }
+
+    function updateStatus() {
+      status.classList.remove("error");
+      if (selectedMoods.size === 0) {
+        status.textContent = "👇 还没选心情呢，点个上面的表情试试看？";
+        return;
+      }
+      const names = [...selectedMoods].map(mood => `${APP_DATA.moods[mood].emoji} ${APP_DATA.moods[mood].label}`);
+      status.textContent = `已感知到你的小情绪：${names.join("、")}。准备好听歌了吗？`;
+    }
+
+    recommendButton.addEventListener("click", () => {
+      recommendations.replaceChildren();
+      quoteBox.style.display = 'none';
+
+      if (selectedMoods.size === 0) {
+        status.textContent = "Oops，请至少告诉我一种心情吧~";
+        status.classList.add("error");
+        return;
+      }
+
+      const moodsArray = Array.from(selectedMoods);
+      const quoteCategory = moodsArray.length > 1 ? 'mixed' : moodsArray[0];
+      const quoteList = APP_DATA.quotes[quoteCategory];
+      const randomQuote = quoteList[Math.floor(Math.random() * quoteList.length)];
+      
+      quoteBox.textContent = `“${randomQuote}”`;
+      quoteBox.style.display = 'block';
+
+      const amount = Number(songCount.value);
+      let totalSongs = 0;
+      let delayIndex = 0;
+
+      selectedMoods.forEach((mood) => {
+        const chosenSongs = getRandomSongs(APP_DATA.songs[mood], amount);
+        totalSongs += chosenSongs.length;
+
+        const section = document.createElement("article");
+        const heading = document.createElement("h2");
+        const list = document.createElement("ul");
+
+        section.className = "mood-results";
+        list.className = "song-list";
+        heading.textContent = `${APP_DATA.moods[mood].emoji} 适合【${APP_DATA.moods[mood].label}】的歌`;
+
+        chosenSongs.forEach((song) => {
+          const item = document.createElement("li");
+          item.className = "song-item";
+          item.style.animationDelay = `${delayIndex * 0.1}s`;
+          delayIndex++;
+
+          const icon = document.createElement("span");
+          icon.className = "song-icon";
+          icon.textContent = "🎵";
+
+          const title = document.createElement("span");
+          title.className = "song-title";
+          title.textContent = song.title;
+
+          const artist = document.createElement("span");
+          artist.className = "artist";
+          artist.textContent = `— ${song.artist}`;
+
+          const tooltip = document.createElement("div");
+          tooltip.className = "lyric-tooltip";
+          tooltip.textContent = `🎶 “${song.lyric}”`;
+
+          item.append(icon, title, artist, tooltip);
+          list.appendChild(item);
+        });
+
+        section.append(heading, list);
+        recommendations.appendChild(section);
+      });
+
+      status.classList.remove("error");
+      status.textContent = `✨ 为你挑选了 ${totalSongs} 首符合心境的歌，希望能陪伴你此刻的时光。`;
+    });
+
+    clearButton.addEventListener("click", () => {
+      selectedMoods.clear();
+      recommendations.replaceChildren();
+      quoteBox.style.display = 'none';
+
+      moodButtons.forEach((button) => {
+        button.classList.remove("selected");
+        button.setAttribute("aria-pressed", "false");
+        button.querySelector(".checkmark").textContent = "";
+      });
+
+      updateStatus();
+      updateBackground(); 
+    });
+  </script>
+</body>
+</html>
